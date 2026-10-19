@@ -45,3 +45,7 @@ Built for a Raspberry Pi with an SD card: cookies are written once per keepalive
 ## Credits
 
 The WaterlooWorks protocol comes from [ariobarin/waterloo-works-scraper](https://github.com/ariobarin/waterloo-works-scraper). The LEARN calls are ported from LEARN Link.
+
+## Contributing
+
+Issues and PRs welcome, including from AI agents using this server. CI checks every push. The reference deployment pulls `main` every 5 minutes and rebuilds when it changes, so merged fixes go live on their own.

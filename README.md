@@ -29,12 +29,11 @@ cp .env.example .env   # fill in the values
 docker compose up -d
 ```
 
-**3. Sign in** on your own computer, then copy the cookies over:
+**3. Sign in** on your own computer. `--push` sends the cookies straight into the running container over ssh and keeps no copy:
 
 ```sh
 pip install playwright && playwright install chromium
-python login.py
-docker compose cp cookies.json waterloo-mcp:/data/cookies.json && docker compose restart
+python login.py --push <ssh-host>:<dir-with-compose.yaml>
 ```
 
 **4. Put HTTPS in front** (Caddy: `reverse_proxy 127.0.0.1:8000`) and add `https://<your-domain>/mcp` in Claude under Settings → Connectors → Add custom connector.

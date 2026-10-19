@@ -53,8 +53,7 @@ async def lifespan(_):
     try:
         yield
     finally:
-        task.cancel()
-        web.save()
+        task.cancel()  # no save here: a restart after login.py --push must not overwrite fresh cookies
 
 
 def is_owner(ctx) -> bool:

@@ -20,6 +20,8 @@ class Learn:
                 raise LookupError(f"Not found on LEARN: {path}")
             if r.ok and "json" in r.headers.get("content-type", ""):
                 return r.json()
+            if r.status_code not in (401, 403) and "json" in r.headers.get("content-type", ""):
+                raise RuntimeError(f"LEARN error {r.status_code}: {r.text[:200]}")
             if attempt == 0:
                 self.web.get(HOST + "/d2l/home")  # bounce through SSO to renew
         raise SignInRequired("LEARN")
@@ -66,10 +68,12 @@ class Learn:
 
     def due(self, days: int = 14):
         now = datetime.now(timezone.utc)
-        window = f"startDateTime={(now - timedelta(days=1)).isoformat()}&endDateTime={(now + timedelta(days=days)).isoformat()}"
+        fmt = "%Y-%m-%dT%H:%M:%S.000Z"  # D2L's UTCDateTime format
+        window = f"startDateTime={(now - timedelta(days=1)).strftime(fmt)}&endDateTime={(now + timedelta(days=days)).strftime(fmt)}"
         events = []
         for c in self.courses():
-            for e in self._api(f"{LE}/{c['id']}/calendar/events/myEvents/?{window}"):
+            page = self._api(f"{LE}/{c['id']}/calendar/events/myEvents/?{window}")
+            for e in page.get("Objects", []) if isinstance(page, dict) else page:  # paged result
                 events.append({"course": c["code"], "title": e["Title"], "start": e["StartDateTime"],
                                "end": e["EndDateTime"], "details": text(e.get("Description"), 200)})
         return sorted(events, key=lambda e: e["start"])

@@ -27,6 +27,9 @@ SERVICES = [
      "usually automatic"),
     ("Crowdmark", "https://app.crowdmark.com/sign-in/waterloo", "https://app.crowdmark.com/student",
      "click 'Sign in with LEARN'"),
+    ("Outline", "https://outline.uwaterloo.ca/viewer/?q=", "https://outline.uwaterloo.ca/viewer/", "usually automatic"),
+    ("Piazza", "https://piazza.com/account/login", "https://piazza.com/class",
+     "log in with your Piazza email and password"),
 ]
 
 

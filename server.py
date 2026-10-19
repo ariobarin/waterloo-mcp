@@ -1,4 +1,4 @@
-"""Waterloo MCP: read-only access to your LEARN, WaterlooWorks, Odyssey, Crowdmark and UW Flow."""
+"""Waterloo MCP: read-only access to LEARN, WaterlooWorks, Odyssey, Crowdmark, Outline, Piazza and UW Flow."""
 
 import asyncio
 import logging
@@ -18,6 +18,8 @@ from starlette.responses import PlainTextResponse, StreamingResponse
 
 import crowdmark
 import odyssey
+import outline
+import piazza
 import uwflow
 from learn import Learn
 from waterlooworks import WaterlooWorks
@@ -36,7 +38,8 @@ ww = WaterlooWorks(web)
 async def keep_sessions_warm():
     """Touch each service so idle timeouts don't end the sessions, then save renewed cookies once."""
     checks = {"LEARN": learn.whoami, "WaterlooWorks": ww.ping,
-              "Odyssey": lambda: odyssey.exam_schedule(web), "Crowdmark": lambda: crowdmark.assessments(web)}
+              "Odyssey": lambda: odyssey.exam_schedule(web), "Crowdmark": lambda: crowdmark.assessments(web),
+              "Outline": lambda: outline.my_outlines(web), "Piazza": lambda: piazza.classes(web)}
     while True:
         for name, check in checks.items():
             try:
@@ -166,6 +169,43 @@ def exam_schedule() -> list[dict]:
 def crowdmark_assessments() -> list[dict]:
     """Your Crowdmark assessments: due dates, submission and whether marks are back."""
     return crowdmark.assessments(web)
+
+
+@mcp.tool
+def outlines() -> list[dict]:
+    """Every course outline you have on outline.uwaterloo.ca, current and past terms, with ids."""
+    return outline.my_outlines(web)
+
+
+@mcp.tool
+def outline_section(outline_id: str, section: str | None = None) -> dict:
+    """One course outline. Without section, lists its sections; with section (e.g. "Assessments",
+    "Class Schedule", "Instructional Team", "Tentative Class Plan"), returns that section's text."""
+    return outline.outline(web, outline_id, section)
+
+
+@mcp.tool
+def piazza_classes() -> list[dict]:
+    """Your Piazza classes with ids."""
+    return piazza.classes(web)
+
+
+@mcp.tool
+def piazza_feed(class_id: str, limit: int = 30) -> list[dict]:
+    """Latest posts in one Piazza class, most recently updated first."""
+    return piazza.feed(web, class_id, limit)
+
+
+@mcp.tool
+def piazza_search(class_id: str, query: str) -> list[dict]:
+    """Search one Piazza class."""
+    return piazza.search(web, class_id, query)
+
+
+@mcp.tool
+def piazza_post(class_id: str, post_id: str) -> dict:
+    """One Piazza post with its answers and follow-ups. post_id is the "id" from feed or search."""
+    return piazza.post(web, class_id, post_id)
 
 
 @mcp.tool

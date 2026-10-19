@@ -8,6 +8,8 @@ Give Claude read-only access to your University of Waterloo services, from one s
 | WaterlooWorks | `ww_jobs` (search, paged), `ww_job` (full posting) |
 | Odyssey | `exam_schedule` (midterms, quizzes, finals, rooms, seats) |
 | Crowdmark | `crowdmark_assessments` (due dates, submissions, marks back) |
+| Outline | `outlines`, `outline_section` (schedule, instructors, assessments, class plan) |
+| Piazza | `piazza_classes`, `piazza_feed`, `piazza_search`, `piazza_post` |
 | UW Flow | `course_info` (description, requisites, ratings; public) |
 
 Nothing here submits, posts or changes anything.

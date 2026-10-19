@@ -73,6 +73,14 @@ class Web:
         with self.lock:
             return self._through_sso(self.session.request(method, url, **kw))
 
+    def stream(self, url: str):
+        """Open a download on its own connection (outside the lock) so big files pass through in chunks."""
+        r = requests.get(url, cookies=self.session.cookies, impersonate="chrome", stream=True, timeout=60)
+        if not r.ok or r.headers.get("content-type", "").startswith("text/html"):
+            r.close()
+            raise SignInRequired(urlsplit(url).hostname)
+        return r
+
     def get(self, url: str, **kw):
         return self.request("GET", url, **kw)
 

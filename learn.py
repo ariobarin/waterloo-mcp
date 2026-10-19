@@ -91,6 +91,9 @@ class Learn:
             }
         return [node(m) for m in self._api(f"{LE}/{course}/content/toc").get("Modules", [])]
 
+    def file_url(self, course: int, topic: int) -> str:
+        return f"{HOST}{LE}/{course}/content/topics/{topic}/file"
+
     def topic(self, course: int, topic: int):
         t = self._api(f"{LE}/{course}/content/topics/{topic}")
         return {"title": t["Title"], "url": t.get("Url"), "type": t.get("TypeIdentifier"),

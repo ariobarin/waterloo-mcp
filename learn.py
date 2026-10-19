@@ -1,5 +1,6 @@
 """LEARN (D2L Brightspace) through its REST API, using your browser session."""
 
+import re
 from datetime import datetime, timedelta, timezone
 
 from web import SignInRequired, Web, text
@@ -75,8 +76,22 @@ class Learn:
             page = self._api(f"{LE}/{c['id']}/calendar/events/myEvents/?{window}")
             for e in page.get("Objects", []) if isinstance(page, dict) else page:  # paged result
                 events.append({"course": c["code"], "title": e["Title"], "start": e["StartDateTime"],
-                               "end": e["EndDateTime"], "details": text(e.get("Description"), 200)})
+                               "end": e["EndDateTime"], "done": self._done(c["id"], e.get("AssociatedEntity")),
+                               "details": text(e.get("Description"), 200)})
         return sorted(events, key=lambda e: e["start"])
+
+    def _done(self, course: int, entity: dict | None) -> bool | None:
+        """Whether you've submitted the quiz or dropbox behind a calendar event; None if unknowable."""
+        kind, eid = (entity or {}).get("AssociatedEntityType", ""), (entity or {}).get("AssociatedEntityId")
+        if kind.endswith("Quiz"):
+            # Students can't read the attempts API, but the quiz summary page says "Completed - N".
+            page = self.web.get(f"{HOST}/d2l/lms/quizzing/user/quiz_summary.d2l?ou={course}&qi={eid}").text
+            found = re.search(r"Completed\s*-\s*(\d+)", text(page) or "")
+            return int(found[1]) > 0 if found else None
+        if kind.endswith("Dropbox"):
+            subs = self._api(f"{LE}/{course}/dropbox/folders/{eid}/submissions/")
+            return any(entity.get("Submissions") for entity in subs)
+        return None
 
     def announcements(self, course: int, limit: int = 10):
         news = sorted(self._api(f"{LE}/{course}/news/"), key=lambda n: n.get("StartDate") or "", reverse=True)

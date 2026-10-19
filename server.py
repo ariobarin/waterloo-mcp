@@ -39,7 +39,7 @@ async def keep_sessions_warm():
     """Touch each service so idle timeouts don't end the sessions, then save renewed cookies once."""
     checks = {"LEARN": learn.whoami, "WaterlooWorks": ww.ping,
               "Odyssey": lambda: odyssey.exam_schedule(web), "Crowdmark": lambda: crowdmark.assessments(web),
-              "Outline": lambda: outline.my_outlines(web), "Piazza": lambda: piazza.classes(web)}
+              "Outline": lambda: outline.search(web), "Piazza": lambda: piazza.classes(web)}
     while True:
         for name, check in checks.items():
             try:
@@ -172,9 +172,10 @@ def crowdmark_assessments() -> list[dict]:
 
 
 @mcp.tool
-def outlines() -> list[dict]:
-    """Every course outline you have on outline.uwaterloo.ca, current and past terms, with ids."""
-    return outline.my_outlines(web)
+def outlines(query: str = "") -> list[dict]:
+    """Course outlines with ids. Empty query: your own courses, all terms. With a query like "CS 341":
+    every matching outline at UW, any term (handy for planning future courses)."""
+    return outline.search(web, query)
 
 
 @mcp.tool

@@ -6,27 +6,27 @@ from web import SignInRequired, Web
 
 HOST = "https://outline.uwaterloo.ca"
 
+SEASONS = {"1": "Winter", "5": "Spring", "9": "Fall"}
+
 
 def _page(web: Web, path: str) -> BeautifulSoup:
     r = web.get(HOST + path)
-    soup = BeautifulSoup(r.text, "html.parser")
-    if not r.url.startswith(HOST) or soup.select_one('a[href="/oidc/logout/"]') is None:
+    if not r.ok or not r.url.startswith(HOST):  # bounced to UW sign-in
         raise SignInRequired("Outline")
-    return soup
+    return BeautifulSoup(r.text, "html.parser")
 
 
-def my_outlines(web: Web) -> list[dict]:
-    soup = _page(web, "/viewer/?q=")
-    out = []
-    for row in soup.select("tr"):
-        link = row.select_one('a[href^="/viewer/view/"]')
-        cells = [td.get_text(" ", strip=True) for td in row.select("td")]
-        if link and cells:
-            term = row.find_previous(["h2", "h3", "h4"])
-            out.append({"id": link["href"].rsplit("/", 1)[-1], "course": cells[0],
-                        "title": cells[1] if len(cells) > 1 else None,
-                        "term": term.get_text(strip=True) if term else None})
-    return out
+def search(web: Web, query: str = "") -> list[dict]:
+    """Empty query: your enrolled courses. Otherwise: every outline at UW matching the query."""
+    r = web.get(f"{HOST}/viewer/api/search/", params={"q": query}, headers={"Accept": "application/json"})
+    if not r.ok or "json" not in r.headers.get("content-type", ""):
+        raise SignInRequired("Outline")
+    return [
+        {"id": o["url"].rstrip("/").rsplit("/", 1)[-1], "course": o["courses"], "title": o["title"],
+         "term": f"{SEASONS.get(o['term'][-1], '?')} 20{o['term'][1:3]}", "sections": o.get("sections"),
+         "instructors": [i.strip() for i in o.get("instructors", []) if i.strip()]}
+        for o in sorted(r.json(), key=lambda o: o["term"], reverse=True)  # newest term first
+    ]
 
 
 def outline(web: Web, outline_id: str, section: str | None = None) -> dict:

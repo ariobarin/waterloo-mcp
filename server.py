@@ -13,7 +13,7 @@ from fastmcp import FastMCP
 from fastmcp.server.auth.providers.discord import DiscordProvider
 from fastmcp.server.middleware import AuthMiddleware
 from fastmcp.utilities.types import File, Image
-from mcp.types import ResourceLink, TextContent
+from mcp.types import TextContent
 from starlette.responses import PlainTextResponse, StreamingResponse
 
 import crowdmark
@@ -89,14 +89,15 @@ mcp.tool(learn.topic, name="learn_topic", description="One content topic's descr
 links: dict[str, tuple[str, float]] = {}  # one-time download token -> (upstream url, expiry); memory only
 
 
-def download_link(url: str, name: str, kind: str, size: int | None) -> ResourceLink:
+def download_link(url: str, name: str, kind: str, size: int | None) -> TextContent:
     now = time.time()
     for token in [t for t, (_, exp) in links.items() if exp < now]:
         del links[token]
     token = secrets.token_urlsafe(24)
     links[token] = (url, now + LINK_SECONDS)
-    return ResourceLink(type="resource_link", uri=f"{os.environ['PUBLIC_URL']}/files/{token}",
-                        name=name, mimeType=kind, size=size, description="Download link, valid 10 minutes")
+    # Plain text rather than a resource_link block: claude.ai doesn't render those yet.
+    return TextContent(type="text", text=f"Download {name} ({kind}, {size or '?'} bytes, one use, 10 min): "
+                                         f"{os.environ['PUBLIC_URL']}/files/{token}")
 
 
 @mcp.custom_route("/files/{token}", methods=["GET"], include_in_schema=False)

@@ -19,13 +19,14 @@ LINK_SECONDS = 600  # download links work for 10 minutes
 
 
 class Files:
-    def __init__(self, web: Web, public_url: str):
+    def __init__(self, web: Web, public_url: str | None):
         self.web = web
         self.public_url = public_url
         self.links: dict[str, tuple[str, float]] = {}  # token -> (upstream url, expiry); memory only
 
     def open(self, url: str, fallback_name: str) -> list:
-        """The file's contents if the model can read them (PDF, image, text under 4 MB), plus a download link."""
+        """The file's contents if the model can read them (PDF, image, text under 4 MB), plus a download
+        link when there's a public URL to serve it from."""
         r = self.web.stream(url)
         try:
             kind = r.headers.get("content-type", "application/octet-stream").split(";")[0]
@@ -36,16 +37,17 @@ class Files:
         finally:
             r.close()
 
-        blocks = [self._link(url, name, kind, size)]
+        blocks = [self._link(url, name, kind, size)] if self.public_url else []
+        unreadable = [TextContent(type="text", text=f"{name} ({kind}, {size or '?'} bytes) can't be opened here.")]
         if data is None:
-            return blocks
+            return blocks or unreadable
         if kind.startswith("image/"):
             return [Image(data=data, format=kind.split("/")[1]), *blocks]
         if kind == "application/pdf":
             return [File(data=data, format="pdf", name=name), *blocks]
         if kind.startswith("text/") or kind in ("application/json", "application/xml"):
             return [TextContent(type="text", text=data.decode("utf-8", "replace")), *blocks]
-        return blocks
+        return blocks or unreadable
 
     async def serve(self, request):
         """Route handler for /files/{token}: pass the file through, then forget the link."""

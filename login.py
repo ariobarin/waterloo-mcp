@@ -10,6 +10,7 @@ Your password goes only to UW's own sign-in page in the browser window.
 
 import argparse
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -70,9 +71,10 @@ def main():
     args = parser.parse_args()
     state = capture()
     if not args.push:
-        out = Path(__file__).with_name("cookies.json")
+        out = Path(os.environ.get("DATA_DIR", Path(__file__).with_name("data"))) / "cookies.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(state)
-        print(f"Saved {out}. Copy it into the server's /data/cookies.json and restart.")
+        print(f"Saved {out}. Restart the server to pick it up.")
         return
     host, directory = args.push.split(":", 1)
     remote = (f"cd {directory} && docker compose stop"

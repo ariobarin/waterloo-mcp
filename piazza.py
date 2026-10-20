@@ -6,6 +6,8 @@ Uses the browser session from login.py. Method names follow the piazza-api libra
 import json
 import random
 
+from fastmcp.exceptions import ToolError
+
 from web import SignInRequired, Web, text
 
 API = "https://piazza.com/logic/api"
@@ -22,7 +24,7 @@ def _call(web: Web, method: str, **params):
     if body.get("error"):
         if "log" in str(body["error"]).lower():
             raise SignInRequired("Piazza")
-        raise RuntimeError(f"Piazza: {body['error']}")
+        raise ToolError(f"Piazza: {body['error']}")
     if "result" not in body:
         raise SignInRequired("Piazza")
     return body["result"]

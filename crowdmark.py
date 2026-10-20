@@ -12,8 +12,13 @@ def _get(web: Web, path: str) -> dict:
     return r.json()
 
 
+def courses(web: Web) -> dict[str, str]:
+    """Course id -> name. Also a cheap keepalive ping."""
+    return {c["id"]: c["attributes"]["name"] for c in _get(web, "/courses")["data"]}
+
+
 def assessments(web: Web) -> list[dict]:
-    courses = {c["id"]: c["attributes"]["name"] for c in _get(web, "/courses")["data"]}
+    courses_by_id = courses(web)
     data = _get(web, "/assignments")
     exams = {i["id"]: i for i in data.get("included", []) if i["type"] == "exam-masters"}
     out = []
@@ -22,7 +27,7 @@ def assessments(web: Web) -> list[dict]:
         exam = exams.get(a["relationships"]["exam-master"]["data"]["id"], {})
         course = exam.get("relationships", {}).get("course", {}).get("data") or {}
         out.append({
-            "course": courses.get(course.get("id")),
+            "course": courses_by_id.get(course.get("id")),
             "title": exam.get("attributes", {}).get("title"),
             "type": exam.get("attributes", {}).get("type"),
             "due": attrs.get("due"),

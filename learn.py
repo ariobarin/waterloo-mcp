@@ -3,6 +3,8 @@
 import re
 from datetime import datetime, timedelta, timezone
 
+from fastmcp.exceptions import ToolError
+
 from web import SignInRequired, Web, text
 
 HOST = "https://learn.uwaterloo.ca"
@@ -18,11 +20,11 @@ class Learn:
         for attempt in range(2):
             r = self.web.get(HOST + path, headers={"Accept": "application/json"})
             if r.status_code == 404:
-                raise LookupError(f"Not found on LEARN: {path}")
+                raise ToolError(f"Not found on LEARN: {path}. Check the ids.")
             if r.ok and "json" in r.headers.get("content-type", ""):
                 return r.json()
             if r.status_code not in (401, 403) and "json" in r.headers.get("content-type", ""):
-                raise RuntimeError(f"LEARN error {r.status_code}: {r.text[:200]}")
+                raise ToolError(f"LEARN refused ({r.status_code}): {r.text[:200]}")
             if attempt == 0:
                 self.web.get(HOST + "/d2l/home")  # bounce through SSO to renew
         raise SignInRequired("LEARN")

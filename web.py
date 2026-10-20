@@ -15,15 +15,16 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
+from fastmcp.exceptions import ToolError
 
 TRUSTED = (".uwaterloo.ca", ".duosecurity.com", "app.crowdmark.com")
 SSO_FIELDS = "input[name=SAMLRequest], input[name=SAMLResponse], input[name=RelayState]"
 
 
-class SignInRequired(RuntimeError):
+class SignInRequired(ToolError):
     def __init__(self, service: str):
         super().__init__(
-            f"{service} needs a fresh sign-in. Run login.py on your computer and copy cookies.json to the server."
+            f"{service} needs a fresh sign-in. The owner should run `python login.py --push <host>:<dir>` on their computer."
         )
 
 
@@ -90,6 +91,8 @@ class Web:
     def _through_sso(self, response):
         """Auto-submit SAML hand-off forms on trusted hosts; stop at anything that wants a human."""
         for _ in range(6):
+            if "html" not in response.headers.get("content-type", ""):
+                return response  # JSON and files never carry SSO forms; skip parsing them
             field = BeautifulSoup(response.text, "html.parser").select_one(SSO_FIELDS)
             form = field and field.find_parent("form")
             if not form:

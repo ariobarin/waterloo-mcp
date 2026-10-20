@@ -23,9 +23,7 @@ SSO_FIELDS = "input[name=SAMLRequest], input[name=SAMLResponse], input[name=Rela
 
 class SignInRequired(ToolError):
     def __init__(self, service: str):
-        super().__init__(
-            f"{service} needs a fresh sign-in. The owner should run `python login.py --push <host>:<dir>` on their computer."
-        )
+        super().__init__(f"{service} needs a fresh sign-in: run `python login.py --push <host>:<dir>` (see README).")
 
 
 def trusted(url: str) -> bool:
@@ -54,9 +52,9 @@ class Web:
         if not self.cookie_file.exists():
             return
         data = json.loads(self.cookie_file.read_text(encoding="utf-8"))
-        for c in data.get("cookies", data) if isinstance(data, dict) else data:
-            if c.get("expires", -1) not in (-1, None) and 0 < c["expires"] <= time.time():
-                continue
+        for c in data["cookies"] if isinstance(data, dict) else data:
+            if 0 < (c.get("expires") or -1) <= time.time():
+                continue  # expired
             self.session.cookies.set(c["name"], c["value"], domain=c["domain"], path=c.get("path", "/"))
 
     def save(self):

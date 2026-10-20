@@ -72,7 +72,8 @@ class Learn:
     def due(self, days: int = 14):
         now = datetime.now(timezone.utc)
         fmt = "%Y-%m-%dT%H:%M:%S.000Z"  # D2L's UTCDateTime format
-        window = f"startDateTime={(now - timedelta(days=1)).strftime(fmt)}&endDateTime={(now + timedelta(days=days)).strftime(fmt)}"
+        start, end = (now - timedelta(days=1)).strftime(fmt), (now + timedelta(days=days)).strftime(fmt)
+        window = f"startDateTime={start}&endDateTime={end}"
         events = []
         for c in self.courses():
             page = self._api(f"{LE}/{c['id']}/calendar/events/myEvents/?{window}")
@@ -92,7 +93,7 @@ class Learn:
             return int(found[1]) > 0 if found else None
         if kind.endswith("Dropbox"):
             subs = self._api(f"{LE}/{course}/dropbox/folders/{eid}/submissions/")
-            return any(entity.get("Submissions") for entity in subs)
+            return any(s.get("Submissions") for s in subs)
         return None
 
     def announcements(self, course: int, limit: int = 10):

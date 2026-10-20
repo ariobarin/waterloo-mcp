@@ -19,7 +19,7 @@ Nothing here submits, posts or changes anything. Files and images come back as c
 
 ```sh
 pip install -r requirements.txt playwright && playwright install chromium
-python login.py
+python login.py                         # add --email you@uwaterloo.ca to have it fill the UW and Piazza sign-in forms
 ```
 
 A browser opens; sign in to each service as usual, Duo included. The session cookies are saved to `data/`. Your password never leaves that browser. When a session eventually expires, `sign_in_status` says so; run `login.py` again.

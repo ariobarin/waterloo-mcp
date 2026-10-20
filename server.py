@@ -85,7 +85,7 @@ mcp = FastMCP(
 )
 
 # Every tool only reads, from services outside this server.
-READ = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
+READ = ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True)
 Course = Annotated[int, Field(description="LEARN course id, from learn_courses")]
 
 # LEARN

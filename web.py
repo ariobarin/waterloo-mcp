@@ -30,7 +30,8 @@ class SignInRequired(ToolError):
             with LOGIN_WANTED.open("a", encoding="utf-8") as f:
                 f.write(service + "\n")
             super().__init__(f"{service} needs a fresh sign-in. The server is signing in again on its own: "
-                             "approve the Duo push on your phone if one comes, then try again in a minute.")
+                             "approve the Duo push on your phone if one comes (if it asks for a code, "
+                             "sign_in_status shows it), then try again in a minute.")
         else:
             super().__init__(f"{service} needs a fresh sign-in: run `python login.py --push <host>:<dir>` (see README).")
 

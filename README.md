@@ -53,7 +53,7 @@ echo AUTOLOGIN=1 >> .env
 docker compose --profile autologin up -d
 ```
 
-A second container keeps a headless browser. When a service signs out, it signs in with your saved passwords and the server picks up the new cookies without a restart. UW still needs Duo: approve the push on your phone. It tells Duo to remember its browser, so most sign-ins skip the push. It signs in at most every 15 minutes and backs off while sign-in keeps failing, so a wrong password can't lock you out. Only that container reads `login.env`; the MCP server never sees your passwords. Leave Piazza blank to keep signing in to it with `login.py`.
+A second container keeps a headless browser. When a service signs out, it signs in with your saved passwords and the server picks up the new cookies without a restart. UW still needs Duo: approve the push on your phone. If Duo asks for a code, `sign_in_status` and `docker compose logs autologin` show it. It tells Duo to remember its browser, so most sign-ins skip the push. It signs in at most every 15 minutes and backs off while sign-in keeps failing, so a wrong password can't lock you out. Only that container reads `login.env`; the MCP server never sees your passwords. Leave Piazza blank to keep signing in to it with `login.py`.
 
 ## Contributing
 

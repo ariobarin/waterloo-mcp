@@ -119,8 +119,12 @@ PiazzaClass = Annotated[str, Field(description="Class id, from piazza_classes")]
 
 @mcp.tool(title="Sign-in status", annotations=READ)
 def sign_in_status() -> dict:
-    """Whether each service's saved sign-in still works, as of the last check (every 20 minutes)."""
-    return status
+    """Whether each service's saved sign-in still works, as of the last check (every 20 minutes), and the code
+    to type into Duo Mobile while the autologin service waits for one."""
+    try:
+        return {**status, "duo_code": (DATA / "duo-code").read_text(encoding="utf-8").strip()}
+    except FileNotFoundError:
+        return status
 
 
 # LEARN

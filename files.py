@@ -4,18 +4,24 @@ Links stream the file through this server in chunks, so nothing is ever written 
 """
 
 import asyncio
+import html
+import io
 import re
 import secrets
 import time
+import zipfile
+from urllib.parse import unquote
 
+from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import File, Image
 from mcp.types import TextContent
 from starlette.responses import PlainTextResponse, StreamingResponse
 
-from web import SignInRequired, Web
+from web import Web, text
 
 INLINE_LIMIT = 4_000_000  # bytes of a file to hand to the model directly
 LINK_SECONDS = 600  # download links work for 10 minutes
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 class Files:
@@ -23,16 +29,18 @@ class Files:
         self.web = web
         self.public_url = public_url
         self.links: dict[str, tuple[str, float]] = {}  # token -> (upstream url, expiry); memory only
+        self.services: dict[str, str] = {}  # upstream url -> service, to name it if a link finds us signed out
 
-    def open(self, url: str, fallback_name: str) -> list:
-        """The file's contents if the model can read them (PDF, image, text under 4 MB), plus a download
-        link when there's a public URL to serve it from."""
-        r = self.web.stream(url)
+    def open(self, url: str, fallback_name: str, service: str) -> list:
+        """The file's contents if the model can read them (PDF, image, text, HTML or Word under 4 MB), plus a
+        download link when there's a public URL to serve it from."""
+        r = self.web.stream(url, service)
+        self.services[url] = service
         try:
             kind = r.headers.get("content-type", "application/octet-stream").split(";")[0]
             size = int(r.headers["content-length"]) if "content-length" in r.headers else None
             found = re.search(r'filename="?([^";]+)', r.headers.get("content-disposition", ""))
-            name = found[1] if found else fallback_name
+            name = unquote(found[1]) if found else fallback_name
             data = self._read_capped(r) if (size or 0) <= INLINE_LIMIT else None
         finally:
             r.close()
@@ -45,6 +53,10 @@ class Files:
             return [Image(data=data, format=kind.split("/")[1]), *blocks]
         if kind == "application/pdf":
             return [File(data=data, format="pdf", name=name), *blocks]
+        if kind == "text/html":
+            return [TextContent(type="text", text=text(data.decode("utf-8", "replace")) or ""), *blocks]
+        if kind == DOCX:
+            return [TextContent(type="text", text=self._docx_text(data)), *blocks]
         if kind.startswith("text/") or kind in ("application/json", "application/xml"):
             return [TextContent(type="text", text=data.decode("utf-8", "replace")), *blocks]
         return blocks or unreadable
@@ -55,8 +67,8 @@ class Files:
         if not url or expiry < time.time():
             return PlainTextResponse("Link expired. Ask Claude for a new one.", status_code=404)
         try:
-            upstream = await asyncio.to_thread(self.web.stream, url)
-        except SignInRequired as e:
+            upstream = await asyncio.to_thread(self.web.stream, url, self.services.get(url, "LEARN"))
+        except ToolError as e:  # signed out, or the file is gone
             return PlainTextResponse(str(e), status_code=502)
         headers = {k: v for k, v in upstream.headers.items() if k.lower() in ("content-length", "content-disposition")}
         return StreamingResponse(upstream.iter_content(chunk_size=65536), headers=headers,
@@ -71,6 +83,13 @@ class Files:
         # Plain text rather than a resource_link block: claude.ai doesn't render those yet.
         return TextContent(type="text", text=f"Download {name} ({kind}, {size or '?'} bytes, one use, 10 min): "
                                              f"{self.public_url}/files/{token}")
+
+    @staticmethod
+    def _docx_text(data: bytes) -> str:
+        """A Word file's text, one paragraph per line; tables come out a cell per line."""
+        xml = zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml").decode("utf-8")
+        paragraphs = (re.findall(r"<w:t(?:\s[^>]*)?>([^<]*)</w:t>", p) for p in xml.split("</w:p>"))
+        return "\n".join(html.unescape("".join(p)) for p in paragraphs if p)
 
     @staticmethod
     def _read_capped(response) -> bytes | None:

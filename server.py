@@ -182,9 +182,9 @@ def learn_topic(course: Course, topic: Annotated[int, Field(description="Topic i
 
 @mcp.tool(title="LEARN file", annotations=READ)
 def learn_file(course: Course, topic: Annotated[int, Field(description="File topic id, from learn_content")]) -> list:
-    """Open a LEARN file. PDFs, images and text up to 4 MB come back as their contents;
-    when hosted over HTTP, every file also gets a one-time download link."""
-    return files.open(learn.file_url(course, topic), f"topic-{topic}")
+    """Open a LEARN file. PDFs, images, text, HTML and Word (.docx) up to 4 MB come back as their contents;
+    when hosted over HTTP, every file also gets a one-time download link. Link topics have no file: use their url."""
+    return files.open(learn.file_url(course, topic), f"topic-{topic}", "LEARN")
 
 
 # WaterlooWorks

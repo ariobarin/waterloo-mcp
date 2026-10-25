@@ -109,13 +109,19 @@ class Web:
             self._reload_if_changed()
             return self._through_sso(self.session.request(method, url, **kw))
 
-    def stream(self, url: str):
-        """Open a download on its own connection (outside the lock) so big files pass through in chunks."""
+    def stream(self, url: str, service: str):
+        """Open a download on its own connection (outside the lock) so big files pass through in chunks.
+        An HTML file is a file too: only a refusal, or a bounce to some other page, means signed out."""
         r = requests.get(url, cookies=self.session.cookies, impersonate="chrome", stream=True, timeout=60)
-        if not r.ok or r.headers.get("content-type", "").startswith("text/html"):
-            r.close()
-            raise SignInRequired(urlsplit(url).hostname)
-        return r
+        bounced = urlsplit(r.url).path != urlsplit(url).path and "html" in r.headers.get("content-type", "")
+        if r.ok and not bounced:
+            return r
+        r.close()
+        if r.status_code in (401, 403) or bounced:
+            raise SignInRequired(service)
+        if r.status_code == 404:
+            raise ToolError(f"No file there on {service}: it may be a link rather than a file (see its url).")
+        raise ToolError(f"{service} refused the download ({r.status_code}).")
 
     def get(self, url: str, **kw):
         return self.request("GET", url, **kw)

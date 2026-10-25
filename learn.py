@@ -81,7 +81,7 @@ class Learn:
                 events.append({"course": c["code"], "title": e["Title"], "start": e["StartDateTime"],
                                "end": e["EndDateTime"], "done": self._done(c["id"], e.get("AssociatedEntity")),
                                "details": text(e.get("Description"), 200)})
-        return sorted(events, key=lambda e: e["start"])
+        return sorted(events, key=lambda e: e["start"] or e["end"] or "")  # some events have no start
 
     def _done(self, course: int, entity: dict | None) -> bool | None:
         """Whether you've submitted the quiz or dropbox behind a calendar event; None if unknowable."""

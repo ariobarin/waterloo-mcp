@@ -17,5 +17,24 @@ services:
         max-file: "2"
     restart: unless-stopped
 
+  # Optional: sign in again by itself. Start with `docker compose --profile autologin up -d` (see README).
+  autologin:
+    profiles: [autologin]
+    build:
+      context: .
+      dockerfile: Dockerfile.autologin
+    env_file:  # your passwords, for this container only
+      - path: login.env
+        required: false
+    volumes:
+      - data:/data
+    shm_size: 256m
+    logging:
+      driver: local
+      options:
+        max-size: 1m
+        max-file: "2"
+    restart: unless-stopped
+
 volumes:
   data:

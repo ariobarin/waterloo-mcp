@@ -21,9 +21,18 @@ TRUSTED = (".uwaterloo.ca", ".duosecurity.com", "app.crowdmark.com")
 SSO_FIELDS = "input[name=SAMLRequest], input[name=SAMLResponse], input[name=RelayState]"
 
 
+LOGIN_WANTED: Path | None = None  # set when the optional autologin service runs; we add services to it to ask for a sign-in
+
+
 class SignInRequired(ToolError):
     def __init__(self, service: str):
-        super().__init__(f"{service} needs a fresh sign-in: run `python login.py --push <host>:<dir>` (see README).")
+        if LOGIN_WANTED:
+            with LOGIN_WANTED.open("a", encoding="utf-8") as f:
+                f.write(service + "\n")
+            super().__init__(f"{service} needs a fresh sign-in. The server is signing in again on its own: "
+                             "approve the Duo push on your phone if one comes, then try again in a minute.")
+        else:
+            super().__init__(f"{service} needs a fresh sign-in: run `python login.py --push <host>:<dir>` (see README).")
 
 
 def trusted(url: str) -> bool:
@@ -48,8 +57,27 @@ class Web:
         self.lock = threading.Lock()
         self._load()
 
+    def _mtime(self) -> float:
+        try:
+            return self.cookie_file.stat().st_mtime
+        except FileNotFoundError:
+            return 0
+
+    def reload_if_changed(self) -> bool:
+        """Pick up cookies a fresh sign-in wrote while we were running. True if it did."""
+        with self.lock:
+            return self._reload_if_changed()
+
+    def _reload_if_changed(self) -> bool:
+        if self._mtime() == self.loaded:
+            return False
+        self.session.cookies.clear()
+        self._load()
+        return True
+
     def _load(self):
-        if not self.cookie_file.exists():
+        self.loaded = self._mtime()
+        if not self.loaded:
             return
         data = json.loads(self.cookie_file.read_text(encoding="utf-8"))
         for c in data["cookies"] if isinstance(data, dict) else data:
@@ -59,6 +87,12 @@ class Web:
 
     def save(self):
         """Persist cookies atomically. Only called after keepalive, so writes stay rare."""
+        with self.lock:
+            if self._reload_if_changed():
+                return  # a fresh sign-in landed; never overwrite it with our older cookies
+            self._save()
+
+    def _save(self):
         cookies = [
             {"name": c.name, "value": c.value, "domain": c.domain, "path": c.path, "expires": c.expires or -1}
             for c in self.session.cookies.jar
@@ -67,9 +101,11 @@ class Web:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"cookies": cookies}, f)
         os.replace(tmp, self.cookie_file)
+        self.loaded = self._mtime()
 
     def request(self, method: str, url: str, **kw):
         with self.lock:
+            self._reload_if_changed()
             return self._through_sso(self.session.request(method, url, **kw))
 
     def stream(self, url: str):

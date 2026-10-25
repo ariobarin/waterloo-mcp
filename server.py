@@ -28,7 +28,11 @@ KEEPALIVE_SECONDS = float(os.environ.get("KEEPALIVE_MINUTES", "20")) * 60
 HTTP = os.environ.get("MCP_TRANSPORT", "stdio") == "http"  # stdio for local clients, http to host it
 
 log = logging.getLogger("waterloo-mcp")
-web = Web(Path(os.environ.get("DATA_DIR", Path(__file__).with_name("data"))) / "cookies.json")
+DATA = Path(os.environ.get("DATA_DIR", Path(__file__).with_name("data")))
+if os.environ.get("AUTOLOGIN") == "1":  # the optional autologin service signs in again whenever we ask
+    import web as web_module
+    web_module.LOGIN_WANTED = DATA / "login-wanted"
+web = Web(DATA / "cookies.json")
 learn = Learn(web)
 ww = WaterlooWorks(web)
 files = Files(web, os.environ["PUBLIC_URL"] if HTTP else None)
@@ -56,7 +60,11 @@ async def keep_sessions_warm():
                 status[name] = {"signed_in": False, "error": str(e)}
             status[name]["checked"] = time.strftime("%Y-%m-%d %H:%M %Z")
         await asyncio.to_thread(web.save)  # one write per cycle keeps SD card wear low
-        await asyncio.sleep(KEEPALIVE_SECONDS)
+        end = time.time() + KEEPALIVE_SECONDS
+        while time.time() < end:  # check again at once when a fresh sign-in lands
+            await asyncio.sleep(30)
+            if await asyncio.to_thread(web.reload_if_changed):
+                break
 
 
 @asynccontextmanager

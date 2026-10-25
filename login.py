@@ -9,6 +9,8 @@ Run on your own computer:
 
 Your passwords go only to UW's and Piazza's own sign-in pages in the browser window. With --email they are
 asked for once, hidden, kept in memory for this run and never written anywhere.
+
+autologin.py reuses this headless on the server, with passwords from its environment (see README).
 """
 
 import argparse
@@ -23,23 +25,26 @@ from playwright.sync_api import Error, sync_playwright
 
 PROFILE = Path(__file__).with_name(".login-profile")  # keeps your SSO session between runs
 
+# name, start page, signed-in page, hint, whether it goes through UW single sign-on (and so Duo)
 SERVICES = [
     ("LEARN", "https://learn.uwaterloo.ca/d2l/home", "https://learn.uwaterloo.ca/d2l/home",
-     "sign in and approve Duo"),
+     "sign in and approve Duo", True),
     ("WaterlooWorks", "https://waterlooworks.uwaterloo.ca/waterloo.htm?action=login",
-     "https://waterlooworks.uwaterloo.ca/myAccount/", "click 'Students/Alumni/Staff' if asked"),
+     "https://waterlooworks.uwaterloo.ca/myAccount/", "click 'Students/Alumni/Staff' if asked", True),
     ("Odyssey", "https://odyssey.uwaterloo.ca/teaching/schedule", "https://odyssey.uwaterloo.ca/teaching/schedule",
-     "usually automatic"),
+     "usually automatic", True),
     ("Crowdmark", "https://app.crowdmark.com/sign-in/waterloo", "https://app.crowdmark.com/student",
-     "usually automatic"),
-    ("Outline", "https://outline.uwaterloo.ca/viewer/?q=", "https://outline.uwaterloo.ca/viewer/", "usually automatic"),
+     "usually automatic", True),
+    ("Outline", "https://outline.uwaterloo.ca/viewer/?q=", "https://outline.uwaterloo.ca/viewer/", "usually automatic",
+     True),
     ("Piazza", "https://piazza.com/account/login", "https://piazza.com/class",
-     "log in with your Piazza email and password"),
+     "log in with your Piazza email and password", False),
 ]
 
 
 class Helper:
-    """Clicks past Crowdmark's school page and fills the UW and Piazza sign-in forms it has passwords for.
+    """Clicks past WaterlooWorks' and Crowdmark's school pages, fills the UW and Piazza sign-in forms it has
+    passwords for, and asks Duo to remember this browser.
 
     Each password is submitted once: a wrong one is yours to retype, not ours to repeat. Duo stays yours.
     """
@@ -51,6 +56,10 @@ class Helper:
         try:
             if page.url.startswith("https://app.crowdmark.com/sign-in/waterloo"):
                 page.click("text=Sign in with LEARN", timeout=2000)
+            elif page.url.startswith("https://waterlooworks.uwaterloo.ca/waterloo.htm"):
+                page.click("text=Students/Alumni/Staff", timeout=2000)
+            elif ".duosecurity.com/" in page.url:
+                page.click("text=Yes, this is my device", timeout=500)  # Duo remembers the browser for a while
             elif self.uw and page.url.startswith("https://adfs.uwaterloo.ca/"):
                 if page.is_visible("#passwordInput"):
                     if "uw" not in self.tried:
@@ -85,21 +94,39 @@ def wait_for(page, prefix: str, helper, timeout: float = 300):
     raise TimeoutError(f"Timed out waiting for {prefix}")
 
 
-def capture(helper) -> str:
+def capture(helper, profile: Path = PROFILE, headless: bool = False, timeout: float = 300,
+            only: set[str] | None = None) -> tuple[str, list[str]]:
+    """Sign in to every service (or `only` these); returns the cookies and the services that didn't make it."""
+    failed, sso_failed = [], False
     with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(PROFILE, headless=False)
+        context = p.chromium.launch_persistent_context(profile, headless=headless)
+        agent = context.pages[0].evaluate("navigator.userAgent") if context.pages else ""
+        if "HeadlessChrome" in agent:  # Duo may turn away a browser that says it's headless
+            context.close()
+            context = p.chromium.launch_persistent_context(profile, headless=True,
+                                                           user_agent=agent.replace("HeadlessChrome", "Chrome"))
         page = context.pages[0] if context.pages else context.new_page()
-        for name, start, done, hint in SERVICES:
-            print(f"{name}: {hint} in the browser window...", flush=True)
+        for name, start, done, hint, sso in SERVICES:
+            if only is not None and name not in only:
+                continue
+            if sso and sso_failed:
+                failed.append(name)  # UW sign-in didn't work; trying again would only send more Duo pushes
+                continue
+            print(f"{name}: {hint}" + ("..." if headless else " in the browser window..."), flush=True)
             try:
                 page.goto(start)
             except Error:
                 pass  # an SSO redirect aborted the first hop; wait_for handles the rest
-            wait_for(page, done, helper)
-            print(f"{name}: ok", flush=True)
+            try:
+                wait_for(page, done, helper, timeout)
+                print(f"{name}: ok", flush=True)
+            except TimeoutError:
+                print(f"{name}: timed out, skipped", flush=True)
+                failed.append(name)
+                sso_failed |= sso
         state = json.dumps(context.storage_state())
         context.close()
-    return state
+    return state, failed
 
 
 def main():
@@ -113,7 +140,9 @@ def main():
         uw = (args.email, getpass.getpass("UW password: "))
         password = getpass.getpass("Piazza password (blank to type it in the browser): ")
         piazza = (args.piazza_email or args.email, password) if password else None
-    state = capture(Helper(uw, piazza))
+    state, failed = capture(Helper(uw, piazza))
+    if failed:
+        print("Not signed in to: " + ", ".join(failed))
     if not args.push:
         out = Path(os.environ.get("DATA_DIR", Path(__file__).with_name("data"))) / "cookies.json"
         out.parent.mkdir(parents=True, exist_ok=True)

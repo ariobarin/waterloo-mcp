@@ -43,6 +43,18 @@ python login.py --push <ssh-host>:<path-to-this-folder>
 
 `--push` sends the cookies straight into the container and keeps no local copy. Add `https://<your-domain>/mcp` to your client as a remote server. Hosted, every file also gets a one-time download link that streams through the server without touching disk.
 
+### Sign in automatically (optional)
+
+To stop running `login.py` whenever a session ends, let the server sign in again by itself. This stores your passwords on the server, so only do it on a machine you trust.
+
+```sh
+cp login.env.example login.env && chmod 600 login.env   # fill in your UW (and optionally Piazza) sign-in
+echo AUTOLOGIN=1 >> .env
+docker compose --profile autologin up -d
+```
+
+A second container keeps a headless browser. When a service signs out, it signs in with your saved passwords and the server picks up the new cookies without a restart. UW still needs Duo: approve the push on your phone. It tells Duo to remember its browser, so most sign-ins skip the push. It signs in at most every 15 minutes and backs off while sign-in keeps failing, so a wrong password can't lock you out. Only that container reads `login.env`; the MCP server never sees your passwords. Leave Piazza blank to keep signing in to it with `login.py`.
+
 ## Contributing
 
 Issues and PRs welcome, including from agents using the server.

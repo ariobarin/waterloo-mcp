@@ -1,4 +1,5 @@
-"""Waterloo MCP: read-only access to LEARN, WaterlooWorks, Odyssey, Crowdmark, Outline, Piazza and UW Flow."""
+"""Waterloo MCP: read-only access to LEARN, WaterlooWorks, Odyssey, Crowdmark, Outline, Piazza, SharePoint
+and UW Flow."""
 
 import asyncio
 import importlib
@@ -18,6 +19,7 @@ import crowdmark
 import odyssey
 import outline
 import piazza
+import sharepoint
 import uwflow
 from files import Files
 from learn import Learn
@@ -45,6 +47,7 @@ PINGS = {
     "Crowdmark": lambda: crowdmark.courses(web),
     "Outline": lambda: outline.search(web),
     "Piazza": lambda: piazza.classes(web),
+    "SharePoint": lambda: sharepoint.ping(web),
 }
 status: dict[str, dict] = {}  # service -> last keepalive result, for sign_in_status
 
@@ -183,8 +186,19 @@ def learn_topic(course: Course, topic: Annotated[int, Field(description="Topic i
 @mcp.tool(title="LEARN file", annotations=READ)
 def learn_file(course: Course, topic: Annotated[int, Field(description="File topic id, from learn_content")]) -> list:
     """Open a LEARN file. PDFs, images, text, HTML and Word (.docx) up to 4 MB come back as their contents;
-    when hosted over HTTP, every file also gets a one-time download link. Link topics have no file: use their url."""
-    return files.open(learn.file_url(course, topic), f"topic-{topic}", "LEARN")
+    when hosted over HTTP, every file also gets a one-time download link. Topics that link to UW SharePoint or
+    OneDrive open that file; other link topics have no file: use their url."""
+    t = learn.topic(course, topic)
+    if sharepoint.is_link(t["url"]):  # SharePoint sends no file name, so name it after the topic
+        return files.open(sharepoint.download_url(t["url"]), t["title"], "SharePoint")
+    return files.open(learn.file_url(course, topic), t["title"], "LEARN")
+
+
+@mcp.tool(title="SharePoint file", annotations=READ)
+def sharepoint_file(url: Annotated[str, Field(description="A uofwaterloo-my.sharepoint.com sharing link")]) -> list:
+    """Open a file shared from UW SharePoint or OneDrive (course schedules, sign-up sheets), the same way
+    learn_file does: Word, PDF, text and images up to 4 MB come back as their contents."""
+    return files.open(sharepoint.download_url(url), "sharepoint-file", "SharePoint")
 
 
 # WaterlooWorks

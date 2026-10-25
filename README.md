@@ -10,6 +10,7 @@ An MCP server with read-only access to your University of Waterloo accounts.
 | Crowdmark | `crowdmark_assessments` |
 | Outline | `outlines` `outline_section` |
 | Piazza | `piazza_classes` `piazza_feed` `piazza_search` `piazza_post` |
+| SharePoint / OneDrive | `sharepoint_file` (and `learn_file` opens LEARN topics that link there) |
 | UW Flow | `course_info` |
 | | `sign_in_status` |
 

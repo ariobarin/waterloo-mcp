@@ -17,8 +17,9 @@ from bs4 import BeautifulSoup
 from curl_cffi import requests
 from fastmcp.exceptions import ToolError
 
-TRUSTED = (".uwaterloo.ca", ".duosecurity.com", "app.crowdmark.com")
-SSO_FIELDS = "input[name=SAMLRequest], input[name=SAMLResponse], input[name=RelayState]"
+TRUSTED = (".uwaterloo.ca", ".duosecurity.com", "app.crowdmark.com", "uofwaterloo-my.sharepoint.com",
+           "uofwaterloo.sharepoint.com")
+SSO_FIELDS = "input[name=SAMLRequest], input[name=SAMLResponse], input[name=RelayState], input[name=id_token]"
 
 
 LOGIN_WANTED: Path | None = None  # set when the optional autologin service runs; we add services to it to ask for a sign-in

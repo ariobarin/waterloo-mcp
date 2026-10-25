@@ -37,6 +37,9 @@ SERVICES = [
      "usually automatic", True),
     ("Outline", "https://outline.uwaterloo.ca/viewer/?q=", "https://outline.uwaterloo.ca/viewer/", "usually automatic",
      True),
+    ("SharePoint", "https://uofwaterloo-my.sharepoint.com/_layouts/15/onedrive.aspx",
+     "https://uofwaterloo-my.sharepoint.com/_layouts/15/onedrive.aspx",
+     "enter your UW email if Microsoft asks, and say Yes to staying signed in", True),
     ("Piazza", "https://piazza.com/account/login", "https://piazza.com/class",
      "log in with your Piazza email and password", False),
 ]
@@ -60,6 +63,13 @@ class Helper:
                 page.click("text=Students/Alumni/Staff", timeout=2000)
             elif ".duosecurity.com/" in page.url:
                 page.click("text=Yes, this is my device", timeout=500)  # Duo remembers the browser for a while
+            elif page.url.startswith("https://login.microsoftonline.com/"):  # SharePoint; hands off to UW's sign-in
+                if page.is_visible("input[name=loginfmt]"):
+                    if self.uw and not page.input_value("input[name=loginfmt]"):
+                        page.fill("input[name=loginfmt]", self.uw[0])
+                        page.click("#idSIButton9")
+                elif page.is_visible("text=Stay signed in?"):
+                    page.click("#idSIButton9")  # Yes: SharePoint then keeps the session for days
             elif self.uw and page.url.startswith("https://adfs.uwaterloo.ca/"):
                 if page.is_visible("#passwordInput"):
                     if "uw" not in self.tried:

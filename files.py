@@ -39,7 +39,7 @@ class Files:
         try:
             kind = r.headers.get("content-type", "application/octet-stream").split(";")[0]
             size = int(r.headers["content-length"]) if "content-length" in r.headers else None
-            found = re.search(r'filename="?([^";]+)', r.headers.get("content-disposition", ""))
+            found = re.search(r"""filename\*?=(?:UTF-8'')?"?([^";]+)""", r.headers.get("content-disposition", ""))
             name = unquote(found[1]) if found else fallback_name
             data = self._read_capped(r) if (size or 0) <= INLINE_LIMIT else None
         finally:

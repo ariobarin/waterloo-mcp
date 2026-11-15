@@ -29,6 +29,9 @@ services:
     volumes:
       - data:/data
     shm_size: 256m
+    # Each sign-in leaves Chrome helper processes behind. As PID 1, python never reaps them and they
+    # pile up as zombies (thousands after a few weeks); a real init (tini) at PID 1 reaps them.
+    init: true
     logging:
       driver: local
       options:
